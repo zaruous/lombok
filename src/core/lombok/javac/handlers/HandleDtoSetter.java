@@ -177,6 +177,22 @@ public class HandleDtoSetter extends JavacAnnotationHandler<DtoSetter> {
 		long access = toJavacModifier(level) | (fieldDecl.mods.flags & Flags.STATIC);
 		
 		JCMethodDecl createdSetter = HandleSetter.createSetter(access, fieldNode, fieldNode.getTreeMaker(), sourceNode, onMethod, onParam);
+		// Append changedMap().put("fieldName", param) to the end of the setter body
+		if (createdSetter != null && createdSetter.params != null && !createdSetter.params.isEmpty()) {
+			JavacTreeMaker maker = fieldNode.getTreeMaker();
+			Name paramName = createdSetter.params.head.name;
+			// call changedMap(): maker.Apply(..., chainDots(fieldNode, "this", "changedMap"), List.nil())
+			JCExpression changedMapCall = maker.Apply(List.<JCExpression>nil(), chainDots(fieldNode, "this", "changedMap"), List.<JCExpression>nil());
+			// select put on the result: maker.Select(changedMapCall, "put")
+			JCExpression putSelect = maker.Select(changedMapCall, fieldNode.toName("put"));
+			// arguments: literal field name and param ident
+			JCExpression key = maker.Literal(fieldDecl.name.toString());
+			JCExpression val = maker.Ident(paramName);
+			JCStatement putCall = maker.Exec(maker.Apply(List.<JCExpression>nil(), putSelect, List.of(key, val)));
+			if (createdSetter.body != null) {
+				createdSetter.body.stats = createdSetter.body.stats.append(putCall);
+			}
+		}
 		injectMethod(fieldNode.up(), createdSetter);
 	}
 }

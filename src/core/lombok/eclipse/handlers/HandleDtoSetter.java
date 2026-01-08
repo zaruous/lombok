@@ -33,6 +33,9 @@ import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
+import org.eclipse.jdt.internal.compiler.ast.MessageSend;
+import org.eclipse.jdt.internal.compiler.ast.ThisReference;
+import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 
 import lombok.AccessLevel;
@@ -175,6 +178,32 @@ public class HandleDtoSetter extends EclipseAnnotationHandler<DtoSetter> {
 		}
 		
 		MethodDeclaration method = HandleSetter.createSetter((TypeDeclaration) fieldNode.up().get(), false, fieldNode, setterName, null, null, shouldReturnThis, modifier, sourceNode, onMethod, onParam);
+		// Append changedMap().put("fieldName", param) to the generated method statements
+		if (method != null && method.arguments != null && method.arguments.length > 0) {
+			int pS = source.sourceStart, pE = source.sourceEnd;
+			long p = (long) pS << 32 | pE;
+
+			MessageSend inner = new MessageSend();
+			inner.sourceStart = pS; inner.sourceEnd = pE; inner.statementEnd = pE;
+			inner.receiver = new ThisReference(pS, pE);
+			inner.selector = "changedMap".toCharArray();
+			inner.arguments = new Expression[0];
+
+			MessageSend putCall = new MessageSend();
+			putCall.sourceStart = pS; putCall.sourceEnd = pE; putCall.statementEnd = pE;
+			putCall.receiver = inner;
+			putCall.selector = "put".toCharArray();
+			putCall.arguments = new Expression[] {
+				new org.eclipse.jdt.internal.compiler.ast.StringLiteral(field.name, pS, pE, 0),
+				new SingleNameReference(method.arguments[0].name, p)
+			};
+
+			Statement[] old = method.statements;
+			Statement[] now = new Statement[(old == null ? 0 : old.length) + 1];
+			if (old != null) System.arraycopy(old, 0, now, 0, old.length);
+			now[now.length - 1] = putCall;
+			method.statements = now;
+		}
 		injectMethod(fieldNode.up(), method);
 	}
 }
