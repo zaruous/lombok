@@ -21,153 +21,162 @@
  */
 package lombok.javac.handlers;
 
-import static lombok.javac.Javac.*;
-import static lombok.core.handlers.HandlerUtil.*;
+import static lombok.core.handlers.HandlerUtil.handleFlagUsage;
 import static lombok.javac.handlers.JavacHandlerUtil.*;
 
 import java.util.Collection;
+
+import com.sun.tools.javac.code.Flags;
+import com.sun.tools.javac.tree.JCTree.JCAnnotation;
+import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
+import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
+import com.sun.tools.javac.util.List;
 
 import lombok.AccessLevel;
 import lombok.ConfigurationKeys;
 import lombok.DtoSetter;
 import lombok.core.AST.Kind;
-import lombok.experimental.Accessors;
 import lombok.core.AnnotationValues;
-import lombok.javac.Javac;
+import lombok.experimental.Accessors;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
-import lombok.javac.JavacTreeMaker;
 import lombok.spi.Provides;
-
-import com.sun.tools.javac.code.Flags;
-import com.sun.tools.javac.tree.JCTree.JCAnnotation;
-import com.sun.tools.javac.tree.JCTree.JCAssign;
-import com.sun.tools.javac.tree.JCTree.JCBlock;
-import com.sun.tools.javac.tree.JCTree.JCExpression;
-import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
-import com.sun.tools.javac.tree.JCTree.JCReturn;
-import com.sun.tools.javac.tree.JCTree.JCStatement;
-import com.sun.tools.javac.tree.JCTree.JCTypeParameter;
-import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
-import com.sun.tools.javac.util.List;
-import com.sun.tools.javac.util.ListBuffer;
-import com.sun.tools.javac.util.Name;
 
 /**
  * Handles the {@code lombok.DtoSetter} annotation for javac.
  */
 @Provides
 public class HandleDtoSetter extends JavacAnnotationHandler<DtoSetter> {
-    private static final String DTOSETTER_NODE_NOT_SUPPORTED_ERR = "@DtoSetter is only supported on a class or a field.";
-
-    public void generateSetterForType(JavacNode typeNode, JavacNode errorNode, AccessLevel level, boolean checkForTypeLevelSetter, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
-        if (checkForTypeLevelSetter) {
-            if (hasAnnotation(DtoSetter.class, typeNode)) {
-                return;
-            }
-        }
-
-        if (!isClass(typeNode)) {
-            errorNode.addError(DTOSETTER_NODE_NOT_SUPPORTED_ERR);
-            return;
-        }
-
-        for (JavacNode field : typeNode.down()) {
-            if (field.getKind() != Kind.FIELD) continue;
-            JCVariableDecl fieldDecl = (JCVariableDecl) field.get();
-            if (fieldDecl.name.toString().startsWith("$")) continue;
-            if ((fieldDecl.mods.flags & Flags.STATIC) != 0) continue;
-            if ((fieldDecl.mods.flags & Flags.FINAL) != 0) continue;
-
-            generateSetterForField(field, errorNode, level, onMethod, onParam);
-        }
-    }
-
-    public void generateSetterForField(JavacNode fieldNode, JavacNode sourceNode, AccessLevel level, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
-        if (hasAnnotation(DtoSetter.class, fieldNode)) {
-            return;
-        }
-
-        createSetterForField(level, fieldNode, sourceNode, false, onMethod, onParam);
-    }
-
-    @Override public void handle(AnnotationValues<DtoSetter> annotation, JCAnnotation ast, JavacNode annotationNode) {
-        handleFlagUsage(annotationNode, ConfigurationKeys.SETTER_FLAG_USAGE, "@DtoSetter");
-
-        Collection<JavacNode> fields = annotationNode.upFromAnnotationToFields();
-        deleteAnnotationIfNeccessary(annotationNode, DtoSetter.class);
-        deleteImportFromCompilationUnit(annotationNode, "lombok.AccessLevel");
-        JavacNode node = annotationNode.up();
-        AccessLevel level = annotation.getInstance().value();
-
-        if (level == AccessLevel.NONE || node == null) return;
-
-        List<JCAnnotation> onMethod = unboxAndRemoveAnnotationParameter(ast, "onMethod", "@DtoSetter(onMethod", annotationNode);
-        if (!onMethod.isEmpty()) {
-            handleFlagUsage(annotationNode, ConfigurationKeys.ON_X_FLAG_USAGE, "@DtoSetter(onMethod=...)");
-        }
-        List<JCAnnotation> onParam = unboxAndRemoveAnnotationParameter(ast, "onParam", "@DtoSetter(onParam", annotationNode);
-        if (!onParam.isEmpty()) {
-            handleFlagUsage(annotationNode, ConfigurationKeys.ON_X_FLAG_USAGE, "@DtoSetter(onParam=...)");
-        }
-
-        switch (node.getKind()) {
-        case FIELD:
-            createSetterForFields(level, fields, annotationNode, true, onMethod, onParam);
-            break;
-        case TYPE:
-            generateSetterForType(node, annotationNode, level, false, onMethod, onParam);
-            break;
-        }
-    }
-
-    public void createSetterForFields(AccessLevel level, Collection<JavacNode> fieldNodes, JavacNode errorNode, boolean whineIfExists, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
-        for (JavacNode fieldNode : fieldNodes) {
-            createSetterForField(level, fieldNode, errorNode, whineIfExists, onMethod, onParam);
-        }
-    }
-
-    public void createSetterForField(AccessLevel level, JavacNode fieldNode, JavacNode sourceNode, boolean whineIfExists, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
-        if (fieldNode.getKind() != Kind.FIELD) {
-            fieldNode.addError(DTOSETTER_NODE_NOT_SUPPORTED_ERR);
-            return;
-        }
-
-        AnnotationValues<Accessors> accessors = JavacHandlerUtil.getAccessorsForField(fieldNode);
-        JCVariableDecl fieldDecl = (JCVariableDecl) fieldNode.get();
-        String methodName = toSetterName(fieldNode, accessors);
-
-        if (methodName == null) {
-            fieldNode.addWarning("Not generating setter for this field: It does not fit your @Accessors prefix list.");
-            return;
-        }
-
-        if ((fieldDecl.mods.flags & Flags.FINAL) != 0) {
-            fieldNode.addWarning("Not generating setter for this field: Setters cannot be generated for final fields.");
-            return;
-        }
-
-        for (String altName : toAllSetterNames(fieldNode, accessors)) {
-            switch (methodExists(altName, fieldNode, false, 1)) {
-            case EXISTS_BY_LOMBOK:
-                return;
-            case EXISTS_BY_USER:
-                if (whineIfExists) {
-                    String altNameExpl = "";
-                    if (!altName.equals(methodName)) altNameExpl = String.format(" (%s)", altName);
-                    fieldNode.addWarning(
-                        String.format("Not generating %s(): A method with that name already exists%s", methodName, altNameExpl));
-                }
-                return;
-            default:
-            case NOT_EXISTS:
-                //continue
-            }
-        }
-
-        long access = toJavacModifier(level) | (fieldDecl.mods.flags & Flags.STATIC);
-
-        JCMethodDecl createdSetter = HandleSetter.createSetter(access, fieldNode, fieldNode.getTreeMaker(), sourceNode, onMethod, onParam);
-        injectMethod(fieldNode.up(), createdSetter);
-    }
+	private static final String DTO_SETTER_NODE_NOT_SUPPORTED_ERR = "@DtoSetter is only supported on a class or a field.";
+	
+	public void generateDtoSetterForType(JavacNode typeNode, JavacNode errorNode, AccessLevel level, boolean checkForTypeLevelSetter, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
+		if (checkForTypeLevelSetter) {
+			if (hasAnnotation(DtoSetter.class, typeNode)) {
+				//The annotation will make it happen, so we can skip it.
+				return;
+			}
+		}
+		
+		if (!isClass(typeNode)) {
+			errorNode.addError(DTO_SETTER_NODE_NOT_SUPPORTED_ERR);
+			return;
+		}
+		
+		for (JavacNode field : typeNode.down()) {
+			if (field.getKind() != Kind.FIELD) continue;
+			JCVariableDecl fieldDecl = (JCVariableDecl) field.get();
+			//Skip fields that start with $
+			if (fieldDecl.name.toString().startsWith("$")) continue;
+			//Skip static fields.
+			if ((fieldDecl.mods.flags & Flags.STATIC) != 0) continue;
+			//Skip final fields.
+			if ((fieldDecl.mods.flags & Flags.FINAL) != 0) continue;
+			
+			generateDtoSetterForField(field, errorNode, level, onMethod, onParam);
+		}
+	}
+	
+	/**
+	 * Generates a dto setter on the stated field.
+	 * 
+	 * Used by {@link HandleData}.
+	 * 
+	 * The difference between this call and the handle method is as follows:
+	 * 
+	 * If there is a {@code lombok.DtoSetter} annotation on the field, it is used and the
+	 * same rules apply (e.g. warning if the method already exists, stated access level applies).
+	 * If not, the setter is still generated if it isn't already there, though there will not
+	 * be a warning if its already there. The default access level is used.
+	 * 
+	 * @param fieldNode The node representing the field you want a setter for.
+	 * @param pos The node responsible for generating the setter (the {@code @Data} or {@code @DtoSetter} annotation).
+	 */
+	public void generateDtoSetterForField(JavacNode fieldNode, JavacNode sourceNode, AccessLevel level, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
+		if (hasAnnotation(DtoSetter.class, fieldNode)) {
+			//The annotation will make it happen, so we can skip it.
+			return;
+		}
+		
+		createDtoSetterForField(level, fieldNode, sourceNode, false, onMethod, onParam);
+	}
+	
+	@Override public void handle(AnnotationValues<DtoSetter> annotation, JCAnnotation ast, JavacNode annotationNode) {
+		handleFlagUsage(annotationNode, ConfigurationKeys.SETTER_FLAG_USAGE, "@DtoSetter");
+		
+		Collection<JavacNode> fields = annotationNode.upFromAnnotationToFields();
+		deleteAnnotationIfNeccessary(annotationNode, DtoSetter.class);
+		deleteImportFromCompilationUnit(annotationNode, "lombok.AccessLevel");
+		JavacNode node = annotationNode.up();
+		AccessLevel level = annotation.getInstance().value();
+		
+		if (level == AccessLevel.NONE || node == null) return;
+		
+		List<JCAnnotation> onMethod = unboxAndRemoveAnnotationParameter(ast, "onMethod", "@DtoSetter(onMethod", annotationNode);
+		if (!onMethod.isEmpty()) {
+			handleFlagUsage(annotationNode, ConfigurationKeys.ON_X_FLAG_USAGE, "@DtoSetter(onMethod=...)");
+		}
+		List<JCAnnotation> onParam = unboxAndRemoveAnnotationParameter(ast, "onParam", "@DtoSetter(onParam", annotationNode);
+		if (!onParam.isEmpty()) {
+			handleFlagUsage(annotationNode, ConfigurationKeys.ON_X_FLAG_USAGE, "@DtoSetter(onParam=...)");
+		}
+		
+		switch (node.getKind()) {
+		case FIELD:
+			createDtoSetterForFields(level, fields, annotationNode, true, onMethod, onParam);
+			break;
+		case TYPE:
+			generateDtoSetterForType(node, annotationNode, level, false, onMethod, onParam);
+			break;
+		}
+	}
+	
+	public void createDtoSetterForFields(AccessLevel level, Collection<JavacNode> fieldNodes, JavacNode errorNode, boolean whineIfExists, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
+		for (JavacNode fieldNode : fieldNodes) {
+			createDtoSetterForField(level, fieldNode, errorNode, whineIfExists, onMethod, onParam);
+		}
+	}
+	
+	public void createDtoSetterForField(AccessLevel level, JavacNode fieldNode, JavacNode sourceNode, boolean whineIfExists, List<JCAnnotation> onMethod, List<JCAnnotation> onParam) {
+		if (fieldNode.getKind() != Kind.FIELD) {
+			fieldNode.addError(DTO_SETTER_NODE_NOT_SUPPORTED_ERR);
+			return;
+		}
+		
+		AnnotationValues<Accessors> accessors = JavacHandlerUtil.getAccessorsForField(fieldNode);
+		JCVariableDecl fieldDecl = (JCVariableDecl) fieldNode.get();
+		String methodName = toSetterName(fieldNode, accessors);
+		
+		if (methodName == null) {
+			fieldNode.addWarning("Not generating setter for this field: It does not fit your @Accessors prefix list.");
+			return;
+		}
+		
+		if ((fieldDecl.mods.flags & Flags.FINAL) != 0) {
+			fieldNode.addWarning("Not generating setter for this field: Setters cannot be generated for final fields.");
+			return;
+		}
+		
+		for (String altName : toAllSetterNames(fieldNode, accessors)) {
+			switch (methodExists(altName, fieldNode, false, 1)) {
+			case EXISTS_BY_LOMBOK:
+				return;
+			case EXISTS_BY_USER:
+				if (whineIfExists) {
+					String altNameExpl = "";
+					if (!altName.equals(methodName)) altNameExpl = String.format(" (%s)", altName);
+					fieldNode.addWarning(
+						String.format("Not generating %s(): A method with that name already exists%s", methodName, altNameExpl));
+				}
+				return;
+			default:
+			case NOT_EXISTS:
+				//continue scanning the other alt names.
+			}
+		}
+		
+		long access = toJavacModifier(level) | (fieldDecl.mods.flags & Flags.STATIC);
+		
+		JCMethodDecl createdSetter = HandleSetter.createSetter(access, fieldNode, fieldNode.getTreeMaker(), sourceNode, onMethod, onParam);
+		injectMethod(fieldNode.up(), createdSetter);
+	}
 }
