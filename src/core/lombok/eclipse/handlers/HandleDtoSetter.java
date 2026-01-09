@@ -29,13 +29,15 @@ import java.util.List;
 
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
+import org.eclipse.jdt.internal.compiler.ast.Expression;
 import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.MessageSend;
 import org.eclipse.jdt.internal.compiler.ast.MethodDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
+import org.eclipse.jdt.internal.compiler.ast.Statement;
+import org.eclipse.jdt.internal.compiler.ast.ThisReference;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
-import org.eclipse.jdt.internal.compiler.ast.MessageSend;
-import org.eclipse.jdt.internal.compiler.ast.ThisReference;
-import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 
 import lombok.AccessLevel;
@@ -178,7 +180,7 @@ public class HandleDtoSetter extends EclipseAnnotationHandler<DtoSetter> {
 		}
 		
 		MethodDeclaration method = HandleSetter.createSetter((TypeDeclaration) fieldNode.up().get(), false, fieldNode, setterName, null, null, shouldReturnThis, modifier, sourceNode, onMethod, onParam);
-		// Append changedMap().put("fieldName", param) to the generated method statements
+		// Append changedMap().put("fieldName", param) 추가.
 		if (method != null && method.arguments != null && method.arguments.length > 0) {
 			int pS = source.sourceStart, pE = source.sourceEnd;
 			long p = (long) pS << 32 | pE;

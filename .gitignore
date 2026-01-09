@@ -25,3 +25,5 @@
 /jvm.locations
 /testenv
 /gpg.keyring
+/apache-ant-1.10.15
+/apache-ant-1.10.15-bin.tar.gz

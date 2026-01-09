@@ -28,9 +28,12 @@ import java.util.Collection;
 
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.tree.JCTree.JCAnnotation;
+import com.sun.tools.javac.tree.JCTree.JCExpression;
 import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
+import com.sun.tools.javac.tree.JCTree.JCStatement;
 import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
 import com.sun.tools.javac.util.List;
+import com.sun.tools.javac.util.Name;
 
 import lombok.AccessLevel;
 import lombok.ConfigurationKeys;
@@ -40,6 +43,7 @@ import lombok.core.AnnotationValues;
 import lombok.experimental.Accessors;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
+import lombok.javac.JavacTreeMaker;
 import lombok.spi.Provides;
 
 /**
@@ -177,7 +181,7 @@ public class HandleDtoSetter extends JavacAnnotationHandler<DtoSetter> {
 		long access = toJavacModifier(level) | (fieldDecl.mods.flags & Flags.STATIC);
 		
 		JCMethodDecl createdSetter = HandleSetter.createSetter(access, fieldNode, fieldNode.getTreeMaker(), sourceNode, onMethod, onParam);
-		// Append changedMap().put("fieldName", param) to the end of the setter body
+		// Append changedMap().put("fieldName", param) 추가.
 		if (createdSetter != null && createdSetter.params != null && !createdSetter.params.isEmpty()) {
 			JavacTreeMaker maker = fieldNode.getTreeMaker();
 			Name paramName = createdSetter.params.head.name;

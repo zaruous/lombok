@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2025 The Project Lombok Authors.
+ * Copyright (C) 2009-2024 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -820,36 +820,17 @@ public class EclipseHandlerUtil {
 	}
 	
 	/**
-	 * Searches the given field node for annotations that are specifically intended to be copied to the getter.
-	 * 
-	 * @param forceCopyJacksonAnnotations If {@code true}, always copy the annotations regardless of regardless of lombok configuration key {@code lombok.copyJacksonAnnotationsToAccessors}.
+	 * Searches the given field node for annotations that are specifically intentioned to be copied to the setter.
 	 */
-	public static Annotation[] findCopyableToGetterAnnotations(EclipseNode node, boolean forceCopyJacksonAnnotations) {
-		if (!forceCopyJacksonAnnotations) {
-			Boolean copyAnnotations = node.getAst().readConfiguration(ConfigurationKeys.COPY_JACKSON_ANNOTATIONS_TO_ACCESSORS);
-			if (copyAnnotations == null || !copyAnnotations) return EMPTY_ANNOTATIONS_ARRAY;
-		}
-		return findAnnotationsInList(node, JACKSON_COPY_TO_GETTER_ANNOTATIONS);
+	public static Annotation[] findCopyableToSetterAnnotations(EclipseNode node) {
+		return findAnnotationsInList(node, COPY_TO_SETTER_ANNOTATIONS);
 	}
-	
+
 	/**
-	 * Searches the given field node for annotations that are specifically intended to be copied to the setter.
-	 * 
-	 * @param forceCopyJacksonAnnotations If {@code true}, always copy the annotations regardless of regardless of lombok configuration key {@code lombok.copyJacksonAnnotationsToAccessors}.
-	 */
-	public static Annotation[] findCopyableToSetterAnnotations(EclipseNode node, boolean forceCopyJacksonAnnotations) {
-		if (!forceCopyJacksonAnnotations) {
-			Boolean copyAnnotations = node.getAst().readConfiguration(ConfigurationKeys.COPY_JACKSON_ANNOTATIONS_TO_ACCESSORS);
-			if (copyAnnotations == null || !copyAnnotations) return EMPTY_ANNOTATIONS_ARRAY;
-		}
-		return findAnnotationsInList(node, JACKSON_COPY_TO_SETTER_ANNOTATIONS);
-	}
-	
-	/**
-	 * Searches the given field node for annotations that are specifically intended to be copied to the builder's singular method.
+	 * Searches the given field node for annotations that are specifically intentioned to be copied to the builder's singular method.
 	 */
 	public static Annotation[] findCopyableToBuilderSingularSetterAnnotations(EclipseNode node) {
-		return findAnnotationsInList(node, JACKSON_COPY_TO_BUILDER_SINGULAR_SETTER_ANNOTATIONS);
+		return findAnnotationsInList(node, COPY_TO_BUILDER_SINGULAR_SETTER_ANNOTATIONS);
 	}
 	
 	/**
@@ -1393,7 +1374,6 @@ public class EclipseHandlerUtil {
 	/**
 	 * Turns an {@code AccessLevel} instance into the flag bit used by eclipse.
 	 */
-	@SuppressWarnings("deprecation") // We have to use MODULE here to make it act according to spec, which is to treat it like `PACKAGE`.
 	public static int toEclipseModifier(AccessLevel value) {
 		switch (value) {
 		case MODULE:
@@ -2163,7 +2143,7 @@ public class EclipseHandlerUtil {
 			for (int i = 0; i < args.length; i++) {
 				args[i].sourceStart = pS;
 				args[i].sourceEnd = pE;
-				na.memberValuePairs[i] = (MemberValuePair) args[i];
+				na.memberValuePairs[i] = (MemberValuePair) args[i];			
 			}
 			setGeneratedBy(na.memberValuePairs[0], source);
 			setGeneratedBy(na.memberValuePairs[0].value, source);
@@ -2756,8 +2736,10 @@ public class EclipseHandlerUtil {
 	 * Returns {@code true} if the provided node is a record declaration (so, not an annotation definition, interface, enum, or plain class).
 	 */
 	public static boolean isRecord(EclipseNode typeNode) {
-		ASTNode node = typeNode.get();
-		return node instanceof TypeDeclaration && isRecord((TypeDeclaration) node);
+		TypeDeclaration typeDecl = null;
+		if (typeNode.get() instanceof TypeDeclaration) typeDecl = (TypeDeclaration) typeNode.get();
+		int modifiers = typeDecl == null ? 0 : typeDecl.modifiers;
+		return (modifiers & AccRecord) != 0;
 	}
 	
 	/**
@@ -2791,14 +2773,6 @@ public class EclipseHandlerUtil {
 		return typeNode.isStatic() || typeNode.up() == null || typeNode.up().getKind() == Kind.COMPILATION_UNIT || isRecord(typeNode);
 	}
 	
-	/**
-	 * Returns {@code true} if the provided type declaration is a record declaration (so, not an annotation definition, interface, enum, or plain class).
-	 */
-	public static boolean isRecord(TypeDeclaration typeDecl) {
-		int modifiers = typeDecl == null ? 0 : typeDecl.modifiers;
-		return (modifiers & AccRecord) != 0;
-	}
-	
 	public static AbstractVariableDeclaration[] getRecordComponents(TypeDeclaration typeDeclaration) {
 		if (typeDeclaration == null || (typeDeclaration.modifiers & AccRecord) == 0) return null;
 		try {
@@ -2825,8 +2799,8 @@ public class EclipseHandlerUtil {
 		return annotations;
 	}
 	
-	private static final Pattern JAVADOC_PATTERN = Pattern.compile("^\\s*\\/\\*\\*(.*?)\\*\\/", Pattern.MULTILINE | Pattern.DOTALL);
-	private static final Pattern LEADING_ASTERISKS_PATTERN = Pattern.compile("^\\s*\\* ?", Pattern.MULTILINE);
+	private static final Pattern JAVADOC_PATTERN = Pattern.compile("^\\s*\\/\\*\\*((?:\\S|\\s)*?)\\*\\/", Pattern.MULTILINE);
+	private static final Pattern LEADING_ASTERISKS_PATTERN = Pattern.compile("(?m)^\\s*\\* ?");
 
 	public static String getDocComment(EclipseNode eclipseNode) {
 		if (eclipseNode.getAst().getSource() == null) return null;
