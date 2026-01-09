@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2025 The Project Lombok Authors.
+ * Copyright (C) 2009-2024 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,13 +31,11 @@ import java.util.regex.Pattern;
 
 import com.sun.tools.javac.parser.Tokens.Comment;
 import com.sun.tools.javac.tree.DocCommentTable;
-import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCClassDecl;
 import com.sun.tools.javac.tree.JCTree.JCCompilationUnit;
 import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
 import com.sun.tools.javac.tree.JCTree.JCVariableDecl;
-import com.sun.tools.javac.util.JCDiagnostic.DiagnosticPosition;
 import com.sun.tools.javac.tree.TreeScanner;
 
 import lombok.javac.CommentInfo;
@@ -132,39 +130,6 @@ public class DocCommentIntegrator {
 			((DocCommentTable) map_).putComment(node, new Comment() {
 				@Override public String getText() {
 					return docCommentContent_;
-				}
-				
-				@Override public Comment stripIndent() {
-					return this;
-				}
-				
-				@Override public DiagnosticPosition getPos() {
-					return new DiagnosticPosition() {
-						public JCTree getTree() {
-							return node;
-						}
-						
-						public int getStartPosition() {
-							return pos;
-						}
-						
-						public int getPreferredPosition() {
-							return pos;
-						}
-						
-						@SuppressWarnings("unused") // We compile against very old versions of javac intentionally (to support old stuff), but this is the method for newer impls.
-						public int getEndPosition(EndPosTable endPosTable) {
-							int end = endPosTable == null ? 0 : endPosTable.getEndPos(node);
-							if (end > pos) return end;
-							return pos + docCommentContent_.length();
-						}
-						
-						public int getEndPosition(Map<JCTree, Integer> endPosTable) {
-							Integer end = endPosTable.get(node);
-							if (end != null && end.intValue() > pos) return end.intValue();
-							return pos + docCommentContent_.length();
-						}
-					};
 				}
 				
 				@Override public int getSourcePos(int index) {

@@ -1,6 +1,8 @@
 // version 14:
 import lombok.NonNull;
 public record NonNullExistingConstructorOnRecord(String a, String b) {
+/* Implicit */  private final String a;
+/* Implicit */  private final String b;
   public NonNullExistingConstructorOnRecord(@NonNull String b) {
     this("default", b);
     if ((b == null))

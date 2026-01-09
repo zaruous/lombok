@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016-2025 The Project Lombok Authors.
+ * Copyright (C) 2016-2024 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -92,13 +92,13 @@ import com.sun.tools.javac.util.Name;
 import com.sun.tools.javac.util.Position;
 
 import lombok.javac.CommentInfo;
-import lombok.javac.CommentInfo.EndConnection;
-import lombok.javac.CommentInfo.StartConnection;
 import lombok.javac.Javac;
-import lombok.javac.JavacTreeMaker.TreeTag;
-import lombok.javac.JavacTreeMaker.TypeTag;
 import lombok.javac.PackageName;
 import lombok.permit.Permit;
+import lombok.javac.CommentInfo.EndConnection;
+import lombok.javac.CommentInfo.StartConnection;
+import lombok.javac.JavacTreeMaker.TreeTag;
+import lombok.javac.JavacTreeMaker.TypeTag;
 
 public class PrettyPrinter extends JCTree.Visitor {
 	private static final String LINE_SEP = System.getProperty("line.separator");
@@ -514,22 +514,8 @@ public class PrettyPrinter extends JCTree.Visitor {
 		println(";", tree);
 	}
 	
-	void printModuleImport(JCTree tree) {
-		JCExpression qualid = readObject(tree, "module", null);
-		
-		aPrint("import module ");
-		print(qualid);
-		println(";", tree);
-	}
-	
 	private Name currentTypeName;
 	@Override public void visitClassDef(JCClassDecl tree) {
-		if ((tree.mods.flags & IMPLICIT_CLASS) != 0) {
-			printClassMembers(tree.defs, false, false);
-			consumeComments(endPos(tree));
-			return;
-		}
-		
 		println();
 		printDocComment(tree);
 		align();
@@ -711,7 +697,7 @@ public class PrettyPrinter extends JCTree.Visitor {
 		 */
 		try {
 			innermostArrayBracketsAreVarargs = varargs;
-			if (tree.vartype == null || tree.vartype.pos == -1 || endPos(tree.vartype) == -1) {
+			if (tree.vartype == null || tree.vartype.pos == -1) {
 				print("var");
 			} else {
 				print(tree.vartype);
@@ -1047,7 +1033,7 @@ public class PrettyPrinter extends JCTree.Visitor {
 		if ((v & NATIVE) != 0) print("native ");
 		if ((v & ABSTRACT) != 0) print("abstract ");
 		if ((v & SEALED) != 0) print("sealed ");
-		if ((v & NON_SEALED) != 0) print("non-sealed "); // Yes, this is a real keyword.
+		if ((v & NON_SEALED) != 0) print("non-sealed ");
 		if ((v & STRICTFP) != 0) print("strictfp ");
 		if ((v & DEFAULT) != 0 && (v & INTERFACE) == 0) print("default ");
 	}
@@ -1613,17 +1599,39 @@ public class PrettyPrinter extends JCTree.Visitor {
 		}
 	}
 	
-	private static final Method getExtendsClause, getEndPosition;
+	private static final Method getExtendsClause, getEndPosition, storeEnd;
 	
 	static {
 		getExtendsClause = getMethod(JCClassDecl.class, "getExtendsClause", new Class<?>[0]);
 		
 		if (getJavaCompilerVersion() < 8) {
 			getEndPosition = getMethod(DiagnosticPosition.class, "getEndPosition", java.util.Map.class);
+			storeEnd = getMethod(java.util.Map.class, "put", Object.class, Object.class);
 		} else {
 			getEndPosition = getMethod(DiagnosticPosition.class, "getEndPosition", "com.sun.tools.javac.tree.EndPosTable");
+			Method storeEndMethodTemp;
+			Class<?> endPosTable;
+			try {
+				endPosTable = Class.forName("com.sun.tools.javac.tree.EndPosTable");
+			} catch (ClassNotFoundException ex) {
+				throw sneakyThrow(ex);
+			}
+			try {
+				storeEndMethodTemp = Permit.getMethod(endPosTable, "storeEnd", JCTree.class, int.class);
+			} catch (NoSuchMethodException e) {
+				try {
+					endPosTable = Class.forName("com.sun.tools.javac.parser.JavacParser$AbstractEndPosTable");
+					storeEndMethodTemp = Permit.getMethod(endPosTable, "storeEnd", JCTree.class, int.class);
+				} catch (NoSuchMethodException ex) {
+					throw sneakyThrow(ex);
+				} catch (ClassNotFoundException ex) {
+					throw sneakyThrow(ex);
+				}
+			}
+			storeEnd = storeEndMethodTemp;
 		}
 		Permit.setAccessible(getEndPosition);
+		Permit.setAccessible(storeEnd);
 	}
 	
 	private static Method getMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
@@ -1724,8 +1732,6 @@ public class PrettyPrinter extends JCTree.Visitor {
 			printRecordPattern(tree);
 		} else if (className.endsWith("$JCAnyPattern")) { // Introduced in JDK22
 			print("_");
-		} else if (className.endsWith("$JCModuleImport")) { // Introduced in JDK25
-			printModuleImport(tree);
 		} else {
 			throw new AssertionError("Unhandled tree type: " + tree.getClass() + ": " + tree);
 		}

@@ -1,6 +1,9 @@
 // version 14:
 import lombok.NonNull;
 public record NonNullOnRecordTypeUse(int a, int b, int c) {
+/* Implicit */  private final int[] a;
+/* Implicit */  private final int @NonNull [] b;
+/* Implicit */  private final int[] @NonNull [] c;
   public @java.lang.SuppressWarnings("all") @lombok.Generated NonNullOnRecordTypeUse(@NonNull int[] a, int @NonNull [] b, int[] @NonNull [] c) {
     super();
     if ((a == null))

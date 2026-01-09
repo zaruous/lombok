@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2025 The Project Lombok Authors.
+ * Copyright (C) 2009-2024 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,7 @@
 package lombok.javac;
 
 import static lombok.javac.JavacTreeMaker.TreeTag.treeTag;
-import static lombok.javac.JavacTreeMaker.TypeTag.*;
+import static lombok.javac.JavacTreeMaker.TypeTag.typeTag;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -77,14 +77,13 @@ public class Javac {
 	
 	private static final AtomicInteger compilerVersion = new AtomicInteger(-1);
 	
-	/* This section includes flags that would ordinarily be in com.sun.tools.javac.code.Flags, but which are 'too new' (we don't compile against older versions of javac for compatibility). */
+	/* This section includes flags that would ordinarily be in Flags, but which are 'too new' (we don't compile against older versions of javac for compatibility). */
 	public static final long RECORD = 1L << 61; // ClassSymbols, MethodSymbols, VarSymbols (Marks types as being records, as well as the 'fields' in the compact declaration, and the canonical constructor)
 	public static final long COMPACT_RECORD_CONSTRUCTOR = 1L << 51; // MethodSymbols (the 'implicit' many-args constructor that records have)
 	public static final long UNINITIALIZED_FIELD = 1L << 51; // VarSymbols (To identify fields that the compact record constructor won't initialize)
 	public static final long GENERATED_MEMBER = 1L << 24; // MethodSymbols, VarSymbols (marks methods and the constructor generated in records)
-	public static final long SEALED = 1L << 62 | 1L << 48; // ClassSymbols (Flag to indicate sealed class/interface declaration) - from the introduction of sealed until ~jdk23, this was 62. In jdk24, it's 48. Ugh.
+	public static final long SEALED = 1L << 62; // ClassSymbols (Flag to indicate sealed class/interface declaration)
 	public static final long NON_SEALED = 1L << 63; // ClassSymbols (Flag to indicate that the class/interface was declared with the non-sealed modifier)
-	public static final long IMPLICIT_CLASS = 1L << 19; // ClassSymbols (Flag to indicate that the class/interface wasn't actually written out; it is an implicitly declared top-level class). Introduced in JDK25, JEP512.
 	
 	/**
 	 * Returns the version of this java compiler, i.e. the JDK that it shipped in. For example, for javac v1.7, this returns {@code 7}.
@@ -185,8 +184,7 @@ public class Javac {
 	public static final TypeTag CTC_NONE = typeTag("NONE");
 	public static final TypeTag CTC_BOT = typeTag("BOT");
 	public static final TypeTag CTC_ERROR = typeTag("ERROR");
-	public static final TypeTag CTC_UNKNOWN = typeTagPermissive("UNKNOWN"); // UNKNOWN has been removed in JDK24, hence, we need to look it up permissively (just make it `null` if it does not exist).
-	
+	public static final TypeTag CTC_UNKNOWN = typeTag("UNKNOWN");
 	public static final TypeTag CTC_UNDETVAR = typeTag("UNDETVAR");
 	public static final TypeTag CTC_CLASS = typeTag("CLASS");
 	
@@ -348,7 +346,7 @@ public class Javac {
 		public static boolean validateJavadoc(Object dc, JCTree node) {
 			DocCommentTable dct = (DocCommentTable) dc;
 			Comment javadoc = dct.getComment(node);
-			return javadoc == null || javadoc.getText() == null || (javadoc.getSourcePos(0) >= 0 && hasParseableDocComment(dct, node));
+			return javadoc == null || javadoc.getText() == null || javadoc.getSourcePos(0) >= 0;
 		}
 		
 		static void setJavadoc(Object dc, JCTree node, String javadoc) {
@@ -366,19 +364,10 @@ public class Javac {
 			}
 		}
 		
-		private static boolean hasParseableDocComment(Object dc, JCTree node) {
-			DocCommentTable dct = (DocCommentTable) dc;
-			return Permit.invokeSneaky(Permit.permissiveGetMethod(DocCommentTable.class, "getCommentTree", JCTree.class), dct, node) != null;
-		}
-		
 		private static Comment createJavadocComment(final String text, final JCTree field) {
 			return new Comment() {
 				@Override public String getText() {
 					return text;
-				}
-				
-				@Override public Comment stripIndent() {
-					return this;
 				}
 				
 				@Override public int getSourcePos(int index) {
@@ -391,10 +380,6 @@ public class Javac {
 				
 				@Override public boolean isDeprecated() {
 					return text.contains("@deprecated") && field instanceof JCVariableDecl && isFieldDeprecated(field);
-				}
-				
-				@Override public DiagnosticPosition getPos() {
-					return field;
 				}
 			};
 		}
@@ -431,7 +416,7 @@ public class Javac {
 			throw sneakyThrow(e.getCause());
 		}
 	}
-
+	
 	public static void storeEnd(JCTree tree, int pos, JCCompilationUnit top) {
 		try {
 			Object endPositions = JCCOMPILATIONUNIT_ENDPOSITIONS.get(top);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2025 The Project Lombok Authors.
+ * Copyright (C) 2009-2024 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -96,7 +96,6 @@ public class EclipsePatcher implements AgentLauncher.AgentLaunchable {
 		patchSyntaxAndOccurrencesHighlighting(sm);
 		patchSortMembersOperation(sm);
 		patchExtractInterfaceAndPullUp(sm);
-		patchExtractVariable(sm);
 		patchAboutDialog(sm);
 		patchEclipseDebugPatches(sm);
 		patchJavadoc(sm);
@@ -226,17 +225,6 @@ public class EclipsePatcher implements AgentLauncher.AgentLaunchable {
 				.build());
 	}
 	
-	private static void patchExtractVariable(ScriptManager sm) {
-		/* Fix sourceEnding for generated nodes to avoid null pointer */
-		sm.addScriptIfWitness(OSGI_TYPES, ScriptBuilder.replaceMethodCall()
-				.target(new MethodTarget("org.eclipse.jdt.internal.corext.refactoring.util.SideEffectChecker", "findFunctionDefinition", "org.eclipse.jdt.core.dom.MethodDeclaration", "org.eclipse.jdt.core.dom.ITypeBinding", "org.eclipse.jdt.core.dom.IMethodBinding"))
-				.methodToReplace(new Hook("org.eclipse.jdt.core.dom.NodeFinder", "perform", "org.eclipse.jdt.core.dom.ASTNode", "org.eclipse.jdt.core.dom.ASTNode", "org.eclipse.jdt.core.ISourceRange"))
-				.replacementMethod(new Hook("lombok.launch.PatchFixesHider$PatchFixes", "findGeneratedNode", "org.eclipse.jdt.core.dom.ASTNode", "org.eclipse.jdt.core.dom.ASTNode", "org.eclipse.jdt.core.ISourceRange", "org.eclipse.jdt.core.dom.IMethodBinding"))
-				.requestExtra(StackRequest.PARAM2)
-				.transplant()
-				.build());
-	}
-	
 	private static void patchInline(ScriptManager sm) {
 		sm.addScriptIfWitness(OSGI_TYPES, ScriptBuilder.wrapReturnValue()
 				.target(new MethodTarget("org.eclipse.jdt.internal.corext.refactoring.code.SourceProvider", "getCodeBlocks", "java.lang.String[]", "org.eclipse.jdt.internal.corext.refactoring.code.CallContext", "org.eclipse.jdt.core.dom.rewrite.ImportRewrite"))
@@ -333,13 +321,6 @@ public class EclipsePatcher implements AgentLauncher.AgentLaunchable {
 				.transplant()
 				.build());
 		
-		sm.addScriptIfWitness(OSGI_TYPES, ScriptBuilder.replaceMethodCall()
-				.target(new MethodTarget("org.eclipse.jdt.internal.core.dom.rewrite.ASTRewriteAnalyzer", "visit"))
-				.methodToReplace(new Hook("org.eclipse.jdt.internal.core.dom.rewrite.TokenScanner", "getTokenEndOffset", "int", "org.eclipse.jdt.internal.compiler.parser.TerminalToken", "int"))
-				.replacementMethod(new Hook("lombok.launch.PatchFixesHider$PatchFixes", "getTokenEndOffsetFixed", "int", "org.eclipse.jdt.internal.core.dom.rewrite.TokenScanner", "java.lang.Object", "int", "java.lang.Object"))
-				.requestExtra(StackRequest.PARAM1)
-				.transplant()
-				.build());
 	}
 	
 	private static void patchPostCompileHookEclipse(ScriptManager sm) {
@@ -1152,23 +1133,6 @@ public class EclipsePatcher implements AgentLauncher.AgentLaunchable {
 		sm.addScriptIfWitness(ECLIPSE_TEST_CLASSES, ScriptBuilder.exitEarly()
 				.target(new MethodTarget("org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration", "print", "java.lang.StringBuffer", "int", "java.lang.StringBuffer"))
 				.decisionMethod(new Hook("lombok.launch.PatchFixesHider$Tests", "isImplicitCanonicalConstructor", "boolean", "org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration", "java.lang.Object"))
-				.valueMethod(new Hook("lombok.launch.PatchFixesHider$Tests", "returnStringBuffer", "java.lang.StringBuffer", "java.lang.Object", "java.lang.StringBuffer"))
-				.request(StackRequest.THIS, StackRequest.PARAM2)
-				.transplant()
-				.build());
-		
-		// Remove implicit record fields in tests
-		sm.addScriptIfWitness(ECLIPSE_TEST_CLASSES, ScriptBuilder.exitEarly()
-				.target(new MethodTarget("org.eclipse.jdt.internal.compiler.ast.FieldDeclaration", "print", "java.lang.StringBuilder", "int", "java.lang.StringBuilder"))
-				.decisionMethod(new Hook("lombok.launch.PatchFixesHider$Tests", "isRecordComponent", "boolean", "org.eclipse.jdt.internal.compiler.ast.FieldDeclaration", "java.lang.Object"))
-				.valueMethod(new Hook("lombok.launch.PatchFixesHider$Tests", "returnStringBuilder", "java.lang.StringBuilder", "java.lang.Object", "java.lang.StringBuilder"))
-				.request(StackRequest.THIS, StackRequest.PARAM2)
-				.transplant()
-				.build());
-		
-		sm.addScriptIfWitness(ECLIPSE_TEST_CLASSES, ScriptBuilder.exitEarly()
-				.target(new MethodTarget("org.eclipse.jdt.internal.compiler.ast.FieldDeclaration", "print", "java.lang.StringBuffer", "int", "java.lang.StringBuffer"))
-				.decisionMethod(new Hook("lombok.launch.PatchFixesHider$Tests", "isRecordComponent", "boolean", "org.eclipse.jdt.internal.compiler.ast.FieldDeclaration", "java.lang.Object"))
 				.valueMethod(new Hook("lombok.launch.PatchFixesHider$Tests", "returnStringBuffer", "java.lang.StringBuffer", "java.lang.Object", "java.lang.StringBuffer"))
 				.request(StackRequest.THIS, StackRequest.PARAM2)
 				.transplant()

@@ -1,6 +1,8 @@
 import lombok.With;
 public record WithOnNestedRecord()<T> {
   public @With record Nested(String a, String b) {
+/* Implicit */    private final String a;
+/* Implicit */    private final String b;
     /**
      * @return a clone of this object, except with this updated property (returns {@code this} if an identical value is passed).
      */
