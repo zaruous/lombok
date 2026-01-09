@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2025 The Project Lombok Authors.
+ * Copyright (C) 2009-2024 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -211,7 +211,7 @@ public class HandleSetter extends JavacAnnotationHandler<Setter> {
 		return createSetter(access, deprecate, field, treeMaker, setterName, paramName, booleanFieldToSet, returnType, returnStatement, source, onMethod, onParam);
 	}
 	
-	public static JCMethodDecl createSetterWithRecv(long access, boolean deprecate, JavacNode field, JavacTreeMaker treeMaker, String setterName, Name paramName, Name booleanFieldToSet, boolean shouldReturnThis, JavacNode source, List<JCAnnotation> onMethod, List<JCAnnotation> onParam, JCVariableDecl recv, boolean forceAnnotationCopying) {
+	public static JCMethodDecl createSetterWithRecv(long access, boolean deprecate, JavacNode field, JavacTreeMaker treeMaker, String setterName, Name paramName, Name booleanFieldToSet, boolean shouldReturnThis, JavacNode source, List<JCAnnotation> onMethod, List<JCAnnotation> onParam, JCVariableDecl recv) {
 		JCExpression returnType = null;
 		JCReturn returnStatement = null;
 		if (shouldReturnThis) {
@@ -241,7 +241,7 @@ public class HandleSetter extends JavacAnnotationHandler<Setter> {
 		List<JCAnnotation> copyableAnnotations = findCopyableAnnotations(field);
 		
 		Name methodName = field.toName(setterName);
-		List<JCAnnotation> annsOnParam = copyAnnotations(onParam, treeMaker).appendList(copyableAnnotations);
+		List<JCAnnotation> annsOnParam = copyAnnotations(onParam).appendList(copyableAnnotations);
 		
 		long flags = JavacHandlerUtil.addFinalIfNeeded(Flags.PARAMETER, field.getContext());
 		JCExpression pType = cloneType(treeMaker, fieldDecl.vartype, source);
@@ -274,17 +274,12 @@ public class HandleSetter extends JavacAnnotationHandler<Setter> {
 		List<JCExpression> throwsClauses = List.nil();
 		JCExpression annotationMethodDefaultValue = null;
 		
-		// Copying Jackson annotations is required for fluent accessors (otherwise Jackson would not find the accessor).
-		AnnotationValues<Accessors> accessors = JavacHandlerUtil.getAccessorsForField(field);
-		boolean fluent = accessors.isExplicit("fluent");
-		Boolean fluentConfig = field.getAst().readConfiguration(ConfigurationKeys.ACCESSORS_FLUENT);
-		if (fluentConfig != null && fluentConfig) fluent = fluentConfig;
-		
-		List<JCAnnotation> annsOnMethod = mergeAnnotations(copyAnnotations(onMethod, treeMaker), findCopyableToSetterAnnotations(field, fluent));
+		List<JCAnnotation> annsOnMethod = mergeAnnotations(copyAnnotations(onMethod), findCopyableToSetterAnnotations(field));
 		if (isFieldDeprecated(field) || deprecate) {
 			annsOnMethod = annsOnMethod.prepend(treeMaker.Annotation(genJavaLangTypeRef(field, "Deprecated"), List.<JCExpression>nil()));
 		}
 		
+		AnnotationValues<Accessors> accessors = JavacHandlerUtil.getAccessorsForField(field);
 		if (shouldMakeFinal(field, accessors)) access |= Flags.FINAL;
 		JCMethodDecl methodDef;
 		if (recv != null && treeMaker.hasMethodDefWithRecvParam()) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2025 The Project Lombok Authors.
+ * Copyright (C) 2020-2023 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -73,8 +73,7 @@ public final class NullAnnotationLibrary implements ConfigurationValueType {
 	public static final NullAnnotationLibrary FINDBUGS = new NullAnnotationLibrary("findbugs", "edu.umd.cs.findbugs.annotations.NonNull", "edu.umd.cs.findbugs.annotations.Nullable", false);
 	public static final NullAnnotationLibrary SPRING = new NullAnnotationLibrary("spring", "org.springframework.lang.NonNull", "org.springframework.lang.Nullable", false);
 	public static final NullAnnotationLibrary JML = new NullAnnotationLibrary("jml", "org.jmlspecs.annotation.NonNull", "org.jmlspecs.annotation.Nullable", false);
-	public static final NullAnnotationLibrary JSPECIFY = new NullAnnotationLibrary("jspecify", "org.jspecify.annotations.NonNull", "org.jspecify.annotations.Nullable", true);
-
+	
 	private static final List<NullAnnotationLibrary> ALL_AVAILABLE;
 	private static final String EXAMPLE_VALUE;
 	
@@ -155,9 +154,5 @@ public final class NullAnnotationLibrary implements ConfigurationValueType {
 		}
 		if (atStart) throw new IllegalArgumentException(MSG + fqn);
 		return fqn;
-	}
-	
-	@Override public String toString() {
-		return key;
 	}
 }
